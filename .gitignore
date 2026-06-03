@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.DS_Store
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.*
+.vite
+coverage/
+**/.DS_Store
+**/Thumbs.db
+.idea/
+.vscode/
+*.local
