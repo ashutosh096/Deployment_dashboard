@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @workspace/deployment-dashboard run build",
-  "outputDirectory": "artifacts/deployment-dashboard/dist/public",
+  "outputDirectory": "public",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": null,
   "rewrites": [
