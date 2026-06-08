@@ -1,17 +1,42 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Production builds
 dist/
-build/
+dist-ssr/
+*.local
+
+# Environment variables
+.env
+.env.production
+.env.staging
+.env.local
+.env.*.local
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS metadata
 .DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.env
-.env.*
-.vite
-coverage/
-**/.DS_Store
-**/Thumbs.db
-.idea/
-.vscode/
-*.local
+pnpm-debug.log*
+
+# Replit/internal tools
+.replit
+.replit-artifact/
+.antigravity/
+.antigravity-ide/
