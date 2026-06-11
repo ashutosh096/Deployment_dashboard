@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter @workspace/deployment-dashboard run build",
+  "buildCommand": "pnpm run typecheck:libs && pnpm --filter @workspace/deployment-dashboard run build",
   "outputDirectory": "public",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": null,
