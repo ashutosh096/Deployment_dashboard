@@ -17,7 +17,7 @@ const inviteLimiter = rateLimit({
  * Rejects with 401 if no key is configured server-side (fail-closed).
  * Rejects with 401 if the header is missing or wrong.
  */
-function requireApiKey(req: Request, res: Response, next: NextFunction): void {
+function requireApiKey(req: any, res: any, next: any): void {
   const configuredKey = process.env.INVITE_API_KEY;
   if (!configuredKey) {
     res.status(503).json({
