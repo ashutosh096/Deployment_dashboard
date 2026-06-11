@@ -5,7 +5,9 @@
     "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+    "moduleResolution": "bundler",
+    "skipLibCheck": true
   },
   "include": ["src"],
   "references": [

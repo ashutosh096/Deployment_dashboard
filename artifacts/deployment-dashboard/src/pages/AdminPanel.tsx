@@ -856,7 +856,10 @@ function UsersTab() {
       } else {
         const data = await resp.json().catch(() => ({}));
         setInviteStatus(s => ({ ...s, [user.id]: "error" }));
-        alert(`Email failed: ${data.error ?? resp.statusText}${data.hint ? `\n\nHint: ${data.hint}` : ""}`);
+        const errMsg = data.error || data.message || resp.statusText || `HTTP ${resp.status}`;
+        const hint = data.hint ? `\n\nHint: ${data.hint}` : "";
+        const statusNote = `\n\n(Status: ${resp.status})`;
+        alert(`Email failed: ${errMsg}${hint}${statusNote}`);
       }
     } catch {
       setInviteStatus(s => ({ ...s, [user.id]: "error" }));

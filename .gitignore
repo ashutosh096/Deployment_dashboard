@@ -42,3 +42,5 @@ pnpm-debug.log*
 .replit-artifact/
 .antigravity/
 .antigravity-ide/
+
+.vercel

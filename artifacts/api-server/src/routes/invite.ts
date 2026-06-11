@@ -129,7 +129,17 @@ router.post("/send-invite", inviteLimiter, requireApiKey, async (req, res) => {
     });
     res.json({ success: true, message: "Invite email sent." });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
+    // Extract as much detail as possible from the nodemailer/SMTP error
+    let msg = "Unknown error";
+    if (err instanceof Error) {
+      const smtpErr = err as Error & { code?: string; responseCode?: number; response?: string };
+      const parts: string[] = [];
+      if (smtpErr.message) parts.push(smtpErr.message);
+      if (smtpErr.code) parts.push(`[code: ${smtpErr.code}]`);
+      if (smtpErr.responseCode) parts.push(`[SMTP ${smtpErr.responseCode}]`);
+      if (smtpErr.response) parts.push(`[response: ${smtpErr.response}]`);
+      msg = parts.join(" ") || "Unknown SMTP error";
+    }
     res.status(502).json({ error: `Failed to send email: ${msg}` });
   }
 });
