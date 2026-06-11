@@ -1,16 +1,17 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "noImplicitAny": false,
     "strictNullChecks": false,
+    "strictPropertyInitialization": false,
     "noEmitOnError": false,
     "isolatedModules": false,
-    "types": ["node"]
+    "types": []
   },
   "include": ["index.ts"]
 }
