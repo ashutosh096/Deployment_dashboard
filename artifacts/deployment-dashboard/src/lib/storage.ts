@@ -8,13 +8,12 @@ import type {
   AuditLogEntry,
   AuditAction,
   UserRole,
-  ItemNote,
   RegisteredUser,
 } from "../types";
 
 const PREFIX = "deploy_dash_";
 const DEFAULT_ADMIN: AdminCredentials = { username: "admin", password: "admin123" };
-const MAX_AUDIT_ENTRIES = 2000;
+const apiBase = import.meta.env.VITE_API_URL ?? "";
 
 function ls_get<T>(key: string): T | null {
   try {
@@ -29,17 +28,7 @@ function ls_remove(key: string): void {
   localStorage.removeItem(PREFIX + key);
 }
 
-/* Normalize a raw deployment from storage to ensure all fields have defaults */
-function normalizeDep(raw: Deployment): Deployment {
-  return {
-    ...raw,
-    runId: raw.runId ?? "",
-    locked: raw.locked ?? false,
-    itemNotes: raw.itemNotes ?? {},
-  };
-}
-
-/* ─── Run ID ─────────────────────────────────────── */
+/* ─── Run ID Generator (Local fallbacks if server has clock skew) ─────────────────── */
 function nextRunId(): string {
   const year = new Date().getFullYear();
   const counterKey = `run_id_counter:${year}`;
@@ -49,7 +38,7 @@ function nextRunId(): string {
   return `RUN-${year}-${String(next).padStart(4, "0")}`;
 }
 
-/* ─── Audit log (append-only) ────────────────────── */
+/* ─── Audit log (Backend-backed) ────────────────── */
 export function appendAuditLog(
   profile: DeveloperProfile | null,
   action: AuditAction,
@@ -61,8 +50,7 @@ export function appendAuditLog(
     product?: ProductId;
   }
 ): void {
-  const existing = ls_get<AuditLogEntry[]>("audit:log") ?? [];
-  const entry: AuditLogEntry = {
+  const entry = {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     userId: profile?.id ?? "system",
@@ -72,12 +60,15 @@ export function appendAuditLog(
     details,
     ...extra,
   };
-  const updated = [entry, ...existing].slice(0, MAX_AUDIT_ENTRIES);
-  ls_set("audit:log", updated);
+  fetch(`${apiBase}/api/audit-logs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  }).catch(err => console.error("Failed to append audit log", err));
 }
 
 export const storage = {
-  /* ─── Profile ─────────────────────────────────── */
+  /* ─── Profile (Stored locally in the browser context) ──────────────── */
   async getProfile(): Promise<DeveloperProfile | null> {
     const p = ls_get<DeveloperProfile>("profile");
     if (!p) return null;
@@ -87,33 +78,45 @@ export const storage = {
     ls_set("profile", profile);
   },
 
-  /* ─── Deployments ─────────────────────────────── */
+  /* ─── Deployments (Backend persistence) ─────────────────────── */
   async getDeploymentIds(): Promise<string[]> {
-    return ls_get<string[]>("deployments:list") ?? [];
+    const list = await this.getAllDeployments();
+    return list.map(d => d.id);
   },
   async saveDeploymentIds(ids: string[]): Promise<void> {
-    ls_set("deployments:list", ids);
+    // Implicitly handled by backend insertion/deletion
   },
   async getDeployment(id: string): Promise<Deployment | null> {
-    const raw = ls_get<Deployment>(`deployment:${id}`);
-    return raw ? normalizeDep(raw) : null;
+    const res = await fetch(`${apiBase}/api/deployments/${id}`);
+    if (!res.ok) return null;
+    return res.json();
   },
   async saveDeployment(deployment: Deployment): Promise<void> {
-    ls_set(`deployment:${deployment.id}`, deployment);
-    const ids = await this.getDeploymentIds();
-    if (!ids.includes(deployment.id)) {
-      await this.saveDeploymentIds([deployment.id, ...ids]);
+    const res = await fetch(`${apiBase}/api/deployments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(deployment),
+    });
+    if (!res.ok) {
+      // Try updating if it already exists
+      const updateRes = await fetch(`${apiBase}/api/deployments/${deployment.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(deployment),
+      });
+      if (!updateRes.ok) throw new Error("Failed to save deployment");
     }
   },
   async deleteDeployment(id: string): Promise<void> {
-    ls_remove(`deployment:${id}`);
-    const ids = await this.getDeploymentIds();
-    await this.saveDeploymentIds(ids.filter(i => i !== id));
+    const res = await fetch(`${apiBase}/api/deployments/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete deployment");
   },
   async getAllDeployments(): Promise<Deployment[]> {
-    const ids = await this.getDeploymentIds();
-    const deps = await Promise.all(ids.map(id => this.getDeployment(id)));
-    return deps.filter(Boolean) as Deployment[];
+    const res = await fetch(`${apiBase}/api/deployments`);
+    if (!res.ok) throw new Error("Failed to fetch deployments");
+    return res.json();
   },
 
   /* ─── New deployment helpers ─────────────────── */
@@ -121,13 +124,15 @@ export const storage = {
     return nextRunId();
   },
 
-  /* ─── Audit log ───────────────────────────────── */
+  /* ─── Audit log (Backend persistence) ────────────────────────── */
   async getAuditLog(): Promise<AuditLogEntry[]> {
-    return ls_get<AuditLogEntry[]>("audit:log") ?? [];
+    const res = await fetch(`${apiBase}/api/audit-logs`);
+    if (!res.ok) throw new Error("Failed to fetch audit logs");
+    return res.json();
   },
   appendAuditLog,
 
-  /* ─── Admin credentials ───────────────────────── */
+  /* ─── Admin credentials (Fallback) ───────────────────────── */
   async getAdminCredentials(): Promise<AdminCredentials> {
     return ls_get<AdminCredentials>("admin:credentials") ?? DEFAULT_ADMIN;
   },
@@ -139,7 +144,7 @@ export const storage = {
     return creds.username === username && creds.password === password;
   },
 
-  /* ─── Admin session ───────────────────────────── */
+  /* ─── Admin session (Stored locally in local session storage) ──── */
   async isAdminLoggedIn(): Promise<boolean> {
     return ls_get<boolean>("admin:session") === true;
   },
@@ -147,7 +152,7 @@ export const storage = {
     ls_set("admin:session", loggedIn);
   },
 
-  /* ─── App session (user login) ────────────────── */
+  /* ─── App session (User login - stored locally to identify browser context) ──── */
   async getAppSession(): Promise<DeveloperProfile | null> {
     return ls_get<DeveloperProfile>("app:session") ?? null;
   },
@@ -159,87 +164,107 @@ export const storage = {
     ls_remove("app:session");
   },
 
-  /* ─── Registered users (admin-managed) ───────── */
+  /* ─── Registered users (Backend persistence) ─────────────────── */
   async getRegisteredUsers(): Promise<RegisteredUser[]> {
-    const users = ls_get<RegisteredUser[]>("registered_users");
-    if (!users || users.length === 0) {
-      const admin: RegisteredUser = {
-        id: "default-admin",
-        name: "Admin",
-        email: "admin@deploydash.local",
-        jobTitle: "System Administrator",
-        userRole: "admin",
-        password: "admin123",
-        createdAt: new Date().toISOString(),
-      };
-      ls_set("registered_users", [admin]);
-      return [admin];
-    }
-    return users;
+    const res = await fetch(`${apiBase}/api/users`);
+    if (!res.ok) throw new Error("Failed to fetch registered users");
+    return res.json();
   },
   async saveRegisteredUsers(users: RegisteredUser[]): Promise<void> {
-    ls_set("registered_users", users);
+    // Handled individually through API
   },
   async addRegisteredUser(user: RegisteredUser): Promise<void> {
-    const users = await this.getRegisteredUsers();
-    users.push(user);
-    ls_set("registered_users", users);
+    const res = await fetch(`${apiBase}/api/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user),
+    });
+    if (!res.ok) throw new Error("Failed to add registered user");
   },
   async updateRegisteredUser(user: RegisteredUser): Promise<void> {
-    const users = await this.getRegisteredUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx >= 0) users[idx] = user;
-    ls_set("registered_users", users);
+    const res = await fetch(`${apiBase}/api/users/${user.id}/role`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userRole: user.userRole }),
+    });
+    if (!res.ok) throw new Error("Failed to update registered user");
   },
   async deleteRegisteredUser(id: string): Promise<void> {
-    const users = await this.getRegisteredUsers();
-    ls_set("registered_users", users.filter(u => u.id !== id));
+    const res = await fetch(`${apiBase}/api/users/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete registered user");
   },
   async verifyUserLogin(email: string, password: string): Promise<RegisteredUser | null> {
-    const users = await this.getRegisteredUsers();
-    return users.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    ) ?? null;
+    const res = await fetch(`${apiBase}/api/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) return null;
+    return res.json();
   },
   async findRegisteredUserByEmail(email: string): Promise<RegisteredUser | null> {
     const users = await this.getRegisteredUsers();
     return users.find(u => u.email.toLowerCase() === email.toLowerCase()) ?? null;
   },
 
-  /* ─── Checklist overrides ─────────────────────── */
+  /* ─── Checklist overrides (Backend persistence) ───────────────── */
   async getChecklistOverrides(product: ProductId): Promise<ChecklistSection[] | null> {
-    return ls_get<ChecklistSection[]>(`checklist:overrides:${product}`);
+    const res = await fetch(`${apiBase}/api/checklists/overrides/${product}`);
+    if (!res.ok) return null;
+    return res.json();
   },
   async saveChecklistOverrides(product: ProductId, sections: ChecklistSection[]): Promise<void> {
-    ls_set(`checklist:overrides:${product}`, sections);
+    const res = await fetch(`${apiBase}/api/checklists/overrides/${product}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sections }),
+    });
+    if (!res.ok) throw new Error("Failed to save checklist overrides");
   },
   async resetChecklistOverrides(product: ProductId): Promise<void> {
-    ls_remove(`checklist:overrides:${product}`);
+    const res = await fetch(`${apiBase}/api/checklists/overrides/${product}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to reset checklist overrides");
   },
 
-  /* ─── Developer assignments ───────────────────── */
+  /* ─── Developer assignments (Backend persistence) ─────────────── */
   async getDeveloperAssignments(): Promise<DeveloperAssignment[]> {
-    return ls_get<DeveloperAssignment[]>("admin:assignments") ?? [];
+    const res = await fetch(`${apiBase}/api/assignments`);
+    if (!res.ok) throw new Error("Failed to fetch developer assignments");
+    return res.json();
   },
   async saveDeveloperAssignments(assignments: DeveloperAssignment[]): Promise<void> {
-    ls_set("admin:assignments", assignments);
+    await Promise.all(assignments.map(a => this.upsertDeveloperAssignment(a)));
   },
   async upsertDeveloperAssignment(assignment: DeveloperAssignment): Promise<void> {
-    const all = await this.getDeveloperAssignments();
-    const idx = all.findIndex(a => a.developerId === assignment.developerId);
-    if (idx >= 0) all[idx] = assignment; else all.push(assignment);
-    ls_set("admin:assignments", all);
+    const res = await fetch(`${apiBase}/api/assignments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(assignment),
+    });
+    if (!res.ok) throw new Error("Failed to save developer assignment");
   },
 
-  /* ─── User roles (admin-managed) ─────────────── */
+  /* ─── User roles (Admin-managed backend roles) ─────────────────── */
   async getUserRoles(): Promise<Record<string, UserRole>> {
-    return ls_get<Record<string, UserRole>>("admin:user_roles") ?? {};
+    const users = await this.getRegisteredUsers();
+    const roles: Record<string, UserRole> = {};
+    users.forEach(u => {
+      roles[u.id] = u.userRole;
+    });
+    return roles;
   },
   async setUserRole(userId: string, role: UserRole): Promise<void> {
-    const roles = await this.getUserRoles();
-    roles[userId] = role;
-    ls_set("admin:user_roles", roles);
-    // Persist to local profile if it's the same user
+    const res = await fetch(`${apiBase}/api/users/${userId}/role`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userRole: role }),
+    });
+    if (!res.ok) throw new Error("Failed to update user role");
+
     const profile = await this.getProfile();
     if (profile?.id === userId) {
       await this.saveProfile({ ...profile, userRole: role });

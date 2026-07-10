@@ -57,28 +57,28 @@ const PRODUCT_BADGE: Record<ProductId, string> = {
 };
 
 const ROLE_UI: Record<UserRole, { label: string; icon: React.ReactNode; cls: string }> = {
-  admin:     { label: "Admin",     icon: <ShieldCheck className="w-3.5 h-3.5" />, cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
-  developer: { label: "Developer", icon: <Code2 className="w-3.5 h-3.5" />,      cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
-  viewer:    { label: "Viewer",    icon: <Eye className="w-3.5 h-3.5" />,         cls: "bg-secondary text-muted-foreground" },
+  admin: { label: "Admin", icon: <ShieldCheck className="w-3.5 h-3.5" />, cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
+  developer: { label: "Developer", icon: <Code2 className="w-3.5 h-3.5" />, cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
+  viewer: { label: "Viewer", icon: <Eye className="w-3.5 h-3.5" />, cls: "bg-secondary text-muted-foreground" },
 };
 
 const AUDIT_ACTION_LABEL: Record<string, { label: string; cls: string }> = {
-  deployment_started:      { label: "Deployment Started",    cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
-  deployment_completed:    { label: "Completed & Locked",    cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
-  deployment_failed:       { label: "Marked Failed",         cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
-  deployment_locked:       { label: "Record Locked",         cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  item_checked:            { label: "Item Checked",          cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" },
-  item_unchecked:          { label: "Item Unchecked",        cls: "bg-secondary text-muted-foreground" },
-  note_added:              { label: "Note Added",            cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
-  checklist_template_edited: { label: "Checklist Edited",   cls: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" },
-  checklist_template_reset:  { label: "Checklist Reset",    cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" },
-  developer_assigned:      { label: "Dev Assigned",         cls: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300" },
-  user_role_changed:       { label: "Role Changed",         cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
-  admin_login:             { label: "Admin Login",           cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  admin_logout:            { label: "Admin Logout",          cls: "bg-secondary text-muted-foreground" },
-  user_invited:            { label: "User Invited",          cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
-  user_created:            { label: "User Created",          cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
-  user_deleted:            { label: "User Deleted",          cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
+  deployment_started: { label: "Deployment Started", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
+  deployment_completed: { label: "Completed & Locked", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
+  deployment_failed: { label: "Marked Failed", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
+  deployment_locked: { label: "Record Locked", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  item_checked: { label: "Item Checked", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" },
+  item_unchecked: { label: "Item Unchecked", cls: "bg-secondary text-muted-foreground" },
+  note_added: { label: "Note Added", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
+  checklist_template_edited: { label: "Checklist Edited", cls: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" },
+  checklist_template_reset: { label: "Checklist Reset", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" },
+  developer_assigned: { label: "Dev Assigned", cls: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300" },
+  user_role_changed: { label: "Role Changed", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
+  admin_login: { label: "Admin Login", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  admin_logout: { label: "Admin Logout", cls: "bg-secondary text-muted-foreground" },
+  user_invited: { label: "User Invited", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
+  user_created: { label: "User Created", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
+  user_deleted: { label: "User Deleted", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
 };
 
 function buildSummaries(deployments: Deployment[]): DeveloperSummary[] {
@@ -653,8 +653,8 @@ function AssignmentsTab({ deployments }: { deployments: Deployment[] }) {
                 {assigned.length === 0
                   ? <p className="text-xs text-muted-foreground">No developers assigned</p>
                   : <div className="flex flex-wrap gap-1.5">
-                      {assigned.map(a => <span key={a.developerId} className="text-xs bg-muted px-2 py-0.5 rounded font-medium">{a.developerName || summaries.find(s => s.id === a.developerId)?.name || "Unknown"}</span>)}
-                    </div>
+                    {assigned.map(a => <span key={a.developerId} className="text-xs bg-muted px-2 py-0.5 rounded font-medium">{a.developerName || summaries.find(s => s.id === a.developerId)?.name || "Unknown"}</span>)}
+                  </div>
                 }
               </CardContent>
             </Card>

@@ -15,6 +15,11 @@ import {
   MoreHorizontal, Clock,
 } from "lucide-react";
 import { format } from "date-fns";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+  BarChart, Bar
+} from "recharts";
 
 const PRODUCT_LABELS: Record<ProductId, string> = { climagro: "Climagro", ehm: "EHM" };
 
@@ -119,6 +124,49 @@ export default function Dashboard() {
   const thisMonthCompleted = thisMonthByProduct.climagro.completed + thisMonthByProduct.ehm.completed;
   const roleInfo = profile ? ROLE_UI[profile.userRole ?? "developer"] : null;
 
+  const last14DaysData = useMemo(() => {
+    const dates = Array.from({ length: 14 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return format(d, "MMM dd");
+    }).reverse();
+
+    const dateMap = new Map<string, { date: string; climagro: number; ehm: number }>();
+    dates.forEach(d => dateMap.set(d, { date: d, climagro: 0, ehm: 0 }));
+
+    deployments.forEach(dep => {
+      const dateStr = format(new Date(dep.startedAt), "MMM dd");
+      if (dateMap.has(dateStr)) {
+        const val = dateMap.get(dateStr)!;
+        if (dep.product === "climagro") val.climagro++;
+        else if (dep.product === "ehm") val.ehm++;
+      }
+    });
+
+    return Array.from(dateMap.values());
+  }, [deployments]);
+
+  const productShareData = useMemo(() => {
+    const climagroCount = deployments.filter(d => d.product === "climagro").length;
+    const ehmCount = deployments.filter(d => d.product === "ehm").length;
+    return [
+      { name: "Climagro", value: climagroCount, color: "#10b981" },
+      { name: "EHM", value: ehmCount, color: "#3b82f6" },
+    ];
+  }, [deployments]);
+
+  const statusBarData = useMemo(() => {
+    return (["climagro", "ehm"] as ProductId[]).map(product => {
+      const productDeps = deployments.filter(d => d.product === product);
+      return {
+        product: product.toUpperCase(),
+        Success: productDeps.filter(d => d.status === "completed").length,
+        Failed: productDeps.filter(d => d.status === "failed").length,
+        "In Progress": productDeps.filter(d => d.status === "in-progress").length,
+      };
+    });
+  }, [deployments]);
+
   return (
     <PageLayout>
       {/* ── Enterprise top bar ───────────────────── */}
@@ -220,68 +268,118 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* ── This month activity ─────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white tracking-tight">
-              {format(new Date(), "MMMM yyyy")} Activity
-            </h2>
-            <span className="text-sm text-slate-400 dark:text-slate-500">
-              {thisMonthTotal} deployment{thisMonthTotal !== 1 ? "s" : ""} this month
-            </span>
+        {/* ── Visual Analytics Grid ─────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Deployment Trends (Area Chart) */}
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Deployment Velocity (Last 14 Days)</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={last14DaysData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorClimagro" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorEhm" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-700/50" />
+                  <XAxis dataKey="date" className="text-[10px] fill-slate-400 font-mono" tickLine={false} />
+                  <YAxis className="text-[10px] fill-slate-400 font-mono" tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      borderColor: "rgba(30, 42, 66, 0.8)",
+                      borderRadius: "6px",
+                      color: "#fff",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }} />
+                  <Area type="monotone" dataKey="climagro" name="Climagro" stroke="#10b981" fillOpacity={1} fill="url(#colorClimagro)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="ehm" name="EHM" stroke="#3b82f6" fillOpacity={1} fill="url(#colorEhm)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(["climagro", "ehm"] as ProductId[]).map(product => {
-              const stats = thisMonthByProduct[product];
-              const completedPct = stats.total ? Math.round((stats.completed  / stats.total) * 100) : 0;
-              const inProgPct    = stats.total ? Math.round((stats.inProgress / stats.total) * 100) : 0;
-              const failedPct    = stats.total ? Math.round((stats.failed     / stats.total) * 100) : 0;
-              return (
-                <div
-                  key={product}
-                  className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-5"
-                  data-testid={`card-month-${product}`}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${product === "climagro" ? "bg-emerald-400" : "bg-[#3b82f6]"}`} />
-                      <span className="font-semibold text-slate-900 dark:text-white">{PRODUCT_LABELS[product]}</span>
-                      <span className="text-xs font-mono uppercase text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{product}</span>
-                    </div>
-                    <span className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{stats.total}</span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full overflow-hidden flex mb-4 bg-slate-100 dark:bg-slate-700">
-                    {stats.completed  > 0 && <div className="h-full bg-emerald-500 transition-all duration-700" style={{ width: `${completedPct}%` }} />}
-                    {stats.inProgress > 0 && <div className="h-full bg-[#3b82f6] transition-all duration-700" style={{ width: `${inProgPct}%` }} />}
-                    {stats.failed     > 0 && <div className="h-full bg-red-400 transition-all duration-700" style={{ width: `${failedPct}%` }} />}
-                    {stats.total === 0 && <div className="h-full w-full bg-slate-200 dark:bg-slate-600" />}
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />Completed
-                      </div>
-                      <span className="font-bold tabular-nums text-slate-900 dark:text-white pl-4">{stats.completed}</span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <CircleDashed className="w-3 h-3 text-[#3b82f6]" />In Progress
-                      </div>
-                      <span className="font-bold tabular-nums text-slate-900 dark:text-white pl-4">{stats.inProgress}</span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <XCircle className="w-3 h-3 text-red-500" />Failed
-                      </div>
-                      <span className="font-bold tabular-nums text-slate-900 dark:text-white pl-4">{stats.failed}</span>
-                    </div>
-                  </div>
-                  {stats.total === 0 && (
-                    <p className="text-xs text-slate-400 mt-3">No deployments this month</p>
-                  )}
+
+          {/* Product Distribution (Donut Chart) */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-5 flex flex-col justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Product Distribution</h3>
+              <p className="text-xs text-slate-400">Total share of runs by product type</p>
+            </div>
+            <div className="h-44 relative flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={productShareData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {productShareData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      borderColor: "rgba(30, 42, 66, 0.8)",
+                      borderRadius: "6px",
+                      color: "#fff",
+                      fontSize: "12px",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute flex flex-col items-center justify-center">
+                <span className="text-xs text-slate-400">Total</span>
+                <span className="text-xl font-bold text-slate-900 dark:text-white">{total}</span>
+              </div>
+            </div>
+            <div className="flex justify-center gap-6 mt-2">
+              {productShareData.map(entry => (
+                <div key={entry.name} className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                  <span className="text-slate-500 dark:text-slate-400">{entry.name}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">({entry.value})</span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* Status Breakdown (Stacked Bar Chart) */}
+          <div className="lg:col-span-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Run Status by Product</h3>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={statusBarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={32}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-700/50" />
+                  <XAxis dataKey="product" className="text-xs font-semibold fill-slate-500" tickLine={false} />
+                  <YAxis className="text-[10px] fill-slate-400 font-mono" tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      borderColor: "rgba(30, 42, 66, 0.8)",
+                      borderRadius: "6px",
+                      color: "#fff",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }} />
+                  <Bar dataKey="Success" name="Completed" stackId="status" fill="#10b981" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="In Progress" name="In Progress" stackId="status" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="Failed" name="Failed" stackId="status" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
